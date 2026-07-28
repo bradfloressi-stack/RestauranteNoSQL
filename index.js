@@ -32,7 +32,7 @@ const menuSchema = new mongoose.Schema({
     precio: Number,
     categoria: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "categorias"
+        ref: "Categoria"
     },
     clasificacion: String, // Desayuno, comida, cena, entrada, bebida
     imagen: String
@@ -62,7 +62,7 @@ const empleadosSchema = new mongoose.Schema({
 
     mesaAsignada: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "mesas"
+        ref: "Mesa"
     }
 
 }, {
@@ -77,7 +77,7 @@ const chefsSchema = new mongoose.Schema({
     posicion: String, //Principal, carnes, presentación
     especialidad:{
         type: mongoose.Schema.Types.ObjectId,
-        ref: "categorias"
+        ref: "Categoria"
     }
 }, {
     timestamps: true
