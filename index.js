@@ -32,7 +32,7 @@ const menuSchema = new mongoose.Schema({
     precio: Number,
     categoria: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "Categoria"
+        ref: "categorias"
     },
     clasificacion: String, // Desayuno, comida, cena, entrada, bebida
     imagen: String
@@ -53,37 +53,45 @@ const mesasSchema = new mongoose.Schema({
 
 const mesa = mongoose.model("Mesa", mesasSchema);
 
-// Definición del esquema empleados
-const empleadosSchema = new mongoose.Schema({
-    nombre: String,
-    cargo: String,
-    edad: Number,
-    sueldo: Number,
-
-    mesaAsignada: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Mesa"
-    }
-
-}, {
+// Definición del esquema roles
+const rolesSchema = new mongoose.Schema({
+    nombre: String
+},{
     timestamps: true
 });
 
-const empleado = mongoose.model("Empleado", empleadosSchema, "empleados");
+const rol = mongoose.model("Rol", rolesSchema, "roles");
 
-// Definición del esquema chefs
-const chefsSchema = new mongoose.Schema({
-    nombre: String,
-    posicion: String, //Principal, carnes, presentación
-    especialidad:{
+// Definición del esquema Usuarios
+const usuariosSchema = new mongoose.Schema({
+    nombreCompleto: String,
+    usuario: String,
+    contrasena: String,
+    rol:{
         type: mongoose.Schema.Types.ObjectId,
-        ref: "Categoria"
+        ref: "roles"
     }
-}, {
+},{
     timestamps: true
 });
 
-const chef = mongoose.model("Chef", chefsSchema, "chefs");
+const usuario = mongoose.model("Usuario", usuariosSchema, "usuarios");
+
+// Definición del esquema ordenes
+const ordenesSchema = new mongoose.Schema({
+    platillo:{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "menu"
+    },
+    mesa:{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "mesas"
+    }
+},{
+    timestamps: true
+});
+
+const orden = mongoose.model("Orden", ordenesSchema, "ordenes");
 // Mensaje de iniciación del servidor
 app.listen(PORT, () => {
     console.log(`Servidor escuchando en http://localhost:${PORT}`);
@@ -451,234 +459,350 @@ app.delete("/mesas/:id", async (req, res) => {
 });
 
 
-// -----------------RUTAS PARA LA COLECCIÓN EMPLEADOS-----------------
-// Obtener todos los empleados
-app.get("/empleados", async (req, res) => {
+// -----------------RUTAS PARA LA COLECCIÓN ROLES-----------------
+// Obtener todos los roles
+app.get("/roles", async (req, res) => {
     try {
-        const empleados = await empleado.find().populate("mesaAsignada");
-        res.json(empleados);
+        const roles = await rol.find();
+        res.json(roles);
     } catch (error) {
         res.status(500).json({
-            mensaje: "Error al obtener los empleados",
+            mensaje: "Error al obtener los roles",
             error: error
         });
     }
 });
 
-// Obtener un empleado por su ID
-app.get("/empleados/:id", async (req, res) => {
+// Obtener un rol por su ID
+app.get("/roles/:id", async (req, res) => {
     try {
         const id = req.params.id;
-        const empleadoEncontrado = await empleado.findById(id).populate("mesaAsignada");
-        if (!empleadoEncontrado) {
+        const rolEncontrado = await rol.findById(id);
+        if (!rolEncontrado) {
             return res.status(404).json({
-                mensaje: "Empleado no encontrado"
+                mensaje: "Rol no encontrado"
             });
         }
-        res.json(empleadoEncontrado);
+        res.json(rolEncontrado);
     } catch (error) {
         res.status(500).json({
-            mensaje: "Error al obtener el empleado",
+            mensaje: "Error al obtener el rol",
             error: error
         });
     }
 });
 
-// Crear un nuevo empleado
-app.post("/empleados", async (req, res) => {
+// Crear un nuevo rol
+app.post("/roles", async (req, res) => {
     try {
-        const { nombre, cargo, edad, sueldo, mesaAsignada } = req.body;
+        const { nombre } = req.body;
 
-        if (!nombre || !cargo) {
+        if (!nombre) {
             return res.status(400).json({
-                mensaje: "Faltan datos del empleado"
+                mensaje: "Faltan datos del rol"
             });
         }
 
-        const nuevoEmpleado = new empleado({
-            nombre, cargo, edad, sueldo, mesaAsignada
+        const nuevoRol = new rol({
+            nombre
         });
 
-        await nuevoEmpleado.save();
+        await nuevoRol.save();
         res.status(201).json({
-            mensaje: "Empleado creado correctamente"
+            mensaje: "Rol creado correctamente"
         });
 
     } catch (error) {
         res.status(400).json({
-            mensaje: "Error al crear el empleado",
+            mensaje: "Error al crear el rol",
             error: error
         });
     }
 });
 
-// Actualizar un empleado existente
-app.put("/empleados/:id", async (req, res) => {
+// Actualizar un rol existente
+app.put("/roles/:id", async (req, res) => {
     try {
         const id = req.params.id;
-        const { nombre, cargo, edad, sueldo, mesaAsignada } = req.body;
+        const { nombre } = req.body;
 
-        const empleadoActualizado = await empleado.findByIdAndUpdate(
+        const rolActualizado = await rol.findByIdAndUpdate(id, { nombre }, { new: true });
+
+        if (!rolActualizado) {
+            return res.status(404).json({
+                mensaje: "Rol no encontrado"
+            });
+        }
+
+        res.json({
+            mensaje: "Rol actualizado exitosamente",
+            rol: rolActualizado
+        });
+
+    } catch (error) {
+        res.status(400).json({
+            mensaje: "Error al actualizar el rol",
+            error: error
+        });
+    }
+});
+
+// Eliminar un rol existente
+app.delete("/roles/:id", async (req, res) => {
+    try {
+        const id = req.params.id;
+        const rolEliminado = await rol.findByIdAndDelete(id);
+
+        if (!rolEliminado) {
+            return res.status(404).json({
+                mensaje: "Rol no encontrado"
+            });
+        }
+
+        res.json({
+            mensaje: "Rol eliminado exitosamente"
+        });
+
+    } catch (error) {
+        res.status(400).json({
+            mensaje: "Error al eliminar el rol",
+            error: error
+        });
+    }
+});
+
+
+// -----------------RUTAS PARA LA COLECCIÓN USUARIOS-----------------
+// Obtener todos los usuarios
+app.get("/usuarios", async (req, res) => {
+    try {
+        const usuarios = await usuario.find().populate("rol");
+        res.json(usuarios);
+    } catch (error) {
+        res.status(500).json({
+            mensaje: "Error al obtener los usuarios",
+            error: error
+        });
+    }
+});
+
+// Obtener un usuario por su ID
+app.get("/usuarios/:id", async (req, res) => {
+    try {
+        const id = req.params.id;
+        const usuarioEncontrado = await usuario.findById(id).populate("rol");
+        if (!usuarioEncontrado) {
+            return res.status(404).json({
+                mensaje: "Usuario no encontrado"
+            });
+        }
+        res.json(usuarioEncontrado);
+    } catch (error) {
+        res.status(500).json({
+            mensaje: "Error al obtener el usuario",
+            error: error
+        });
+    }
+});
+
+// Crear un nuevo usuario
+app.post("/usuarios", async (req, res) => {
+    try {
+        const { nombreCompleto, usuario: nombreUsuario, contrasena, rol } = req.body;
+
+        if (!nombreCompleto || !nombreUsuario || !contrasena) {
+            return res.status(400).json({
+                mensaje: "Faltan datos del usuario"
+            });
+        }
+
+        const nuevoUsuario = new usuario({
+            nombreCompleto,
+            usuario: nombreUsuario,
+            contrasena,
+            rol
+        });
+
+        await nuevoUsuario.save();
+        res.status(201).json({
+            mensaje: "Usuario creado correctamente"
+        });
+
+    } catch (error) {
+        res.status(400).json({
+            mensaje: "Error al crear el usuario",
+            error: error
+        });
+    }
+});
+
+// Actualizar un usuario existente
+app.put("/usuarios/:id", async (req, res) => {
+    try {
+        const id = req.params.id;
+        const { nombreCompleto, usuario: nombreUsuario, contrasena, rol } = req.body;
+
+        const usuarioActualizado = await usuario.findByIdAndUpdate(
             id,
-            { nombre, cargo, edad, sueldo, mesaAsignada },
+            { nombreCompleto, usuario: nombreUsuario, contrasena, rol },
             { new: true }
         );
 
-        if (!empleadoActualizado) {
+        if (!usuarioActualizado) {
             return res.status(404).json({
-                mensaje: "Empleado no encontrado"
+                mensaje: "Usuario no encontrado"
             });
         }
 
         res.json({
-            mensaje: "Empleado actualizado exitosamente",
-            empleado: empleadoActualizado
+            mensaje: "Usuario actualizado exitosamente",
+            usuario: usuarioActualizado
         });
 
     } catch (error) {
         res.status(400).json({
-            mensaje: "Error al actualizar el empleado",
+            mensaje: "Error al actualizar el usuario",
             error: error
         });
     }
 });
 
-// Eliminar un empleado existente
-app.delete("/empleados/:id", async (req, res) => {
+// Eliminar un usuario existente
+app.delete("/usuarios/:id", async (req, res) => {
     try {
         const id = req.params.id;
-        const empleadoEliminado = await empleado.findByIdAndDelete(id);
+        const usuarioEliminado = await usuario.findByIdAndDelete(id);
 
-        if (!empleadoEliminado) {
+        if (!usuarioEliminado) {
             return res.status(404).json({
-                mensaje: "Empleado no encontrado"
+                mensaje: "Usuario no encontrado"
             });
         }
 
         res.json({
-            mensaje: "Empleado eliminado exitosamente"
+            mensaje: "Usuario eliminado exitosamente"
         });
 
     } catch (error) {
         res.status(400).json({
-            mensaje: "Error al eliminar el empleado",
+            mensaje: "Error al eliminar el usuario",
             error: error
         });
     }
 });
 
 
-// -----------------RUTAS PARA LA COLECCIÓN CHEFS-----------------
-// Obtener todos los chefs
-app.get("/chefs", async (req, res) => {
+// -----------------RUTAS PARA LA COLECCIÓN ÓRDENES-----------------
+// Obtener todas las órdenes
+app.get("/ordenes", async (req, res) => {
     try {
-        const chefs = await chef.find().populate("especialidad");
-        res.json(chefs);
+        const ordenes = await orden.find().populate("platillo").populate("mesa");
+        res.json(ordenes);
     } catch (error) {
         res.status(500).json({
-            mensaje: "Error al obtener los chefs",
+            mensaje: "Error al obtener las órdenes",
             error: error
         });
     }
 });
 
-// Obtener un chef por su ID
-app.get("/chefs/:id", async (req, res) => {
+// Obtener una orden por su ID
+app.get("/ordenes/:id", async (req, res) => {
     try {
         const id = req.params.id;
-        const chefEncontrado = await chef.findById(id).populate("especialidad");
-        if (!chefEncontrado) {
+        const ordenEncontrada = await orden.findById(id).populate("platillo").populate("mesa");
+        if (!ordenEncontrada) {
             return res.status(404).json({
-                mensaje: "Chef no encontrado"
+                mensaje: "Orden no encontrada"
             });
         }
-        res.json(chefEncontrado);
+        res.json(ordenEncontrada);
     } catch (error) {
         res.status(500).json({
-            mensaje: "Error al obtener el chef",
+            mensaje: "Error al obtener la orden",
             error: error
         });
     }
 });
 
-// Crear un nuevo chef
-app.post("/chefs", async (req, res) => {
+// Crear una nueva orden
+app.post("/ordenes", async (req, res) => {
     try {
-        const { nombre, posicion, especialidad } = req.body;
+        const { platillo, mesa } = req.body;
 
-        if (!nombre || !posicion) {
+        if (!platillo || !mesa) {
             return res.status(400).json({
-                mensaje: "Faltan datos del chef"
+                mensaje: "Faltan datos de la orden"
             });
         }
 
-        const nuevoChef = new chef({
-            nombre, posicion, especialidad
+        const nuevaOrden = new orden({
+            platillo, mesa
         });
 
-        await nuevoChef.save();
+        await nuevaOrden.save();
         res.status(201).json({
-            mensaje: "Chef creado correctamente"
+            mensaje: "Orden creada correctamente"
         });
 
     } catch (error) {
         res.status(400).json({
-            mensaje: "Error al crear el chef",
+            mensaje: "Error al crear la orden",
             error: error
         });
     }
 });
 
-// Actualizar un chef existente
-app.put("/chefs/:id", async (req, res) => {
+// Actualizar una orden existente
+app.put("/ordenes/:id", async (req, res) => {
     try {
         const id = req.params.id;
-        const { nombre, posicion, especialidad } = req.body;
+        const { platillo, mesa } = req.body;
 
-        const chefActualizado = await chef.findByIdAndUpdate(
+        const ordenActualizada = await orden.findByIdAndUpdate(
             id,
-            { nombre, posicion, especialidad },
+            { platillo, mesa },
             { new: true }
         );
 
-        if (!chefActualizado) {
+        if (!ordenActualizada) {
             return res.status(404).json({
-                mensaje: "Chef no encontrado"
+                mensaje: "Orden no encontrada"
             });
         }
 
         res.json({
-            mensaje: "Chef actualizado exitosamente",
-            chef: chefActualizado
+            mensaje: "Orden actualizada exitosamente",
+            orden: ordenActualizada
         });
 
     } catch (error) {
         res.status(400).json({
-            mensaje: "Error al actualizar el chef",
+            mensaje: "Error al actualizar la orden",
             error: error
         });
     }
 });
 
-// Eliminar un chef existente
-app.delete("/chefs/:id", async (req, res) => {
+// Eliminar una orden existente
+app.delete("/ordenes/:id", async (req, res) => {
     try {
         const id = req.params.id;
-        const chefEliminado = await chef.findByIdAndDelete(id);
+        const ordenEliminada = await orden.findByIdAndDelete(id);
 
-        if (!chefEliminado) {
+        if (!ordenEliminada) {
             return res.status(404).json({
-                mensaje: "Chef no encontrado"
+                mensaje: "Orden no encontrada"
             });
         }
 
         res.json({
-            mensaje: "Chef eliminado exitosamente"
+            mensaje: "Orden eliminada exitosamente"
         });
 
     } catch (error) {
         res.status(400).json({
-            mensaje: "Error al eliminar el chef",
+            mensaje: "Error al eliminar la orden",
             error: error
         });
     }
