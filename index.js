@@ -237,33 +237,7 @@ app.get("/categorias/:id", async (req, res) => {
     }
 });
 
-// Crear una nueva categoría
-app.post("/categorias", requiereCampos("nombre", "descripcion"), async (req, res) => {
-    try {
-        const {
-            nombre,
-            descripcion
-        } = req.body;
 
-        const nuevaCategoria = new categoria({
-            nombre, descripcion
-        });
-
-
-
-        await nuevaCategoria.save();
-        res.status(201).json({
-        mensaje: "Categoría creada correctamente",
-        categoria: nuevaCategoria
-        });
-
-    } catch (error) {
-        res.status(400).json({
-            mensaje: "Error al crear la categoría",
-            error: error
-        })
-    }
-});
 
 // Actualizar categoría existente
 app.put("/categorias/:id", async (req, res) => {
