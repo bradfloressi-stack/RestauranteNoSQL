@@ -551,19 +551,50 @@ export default {
       }
       this.modalPlatillo = true
     },
-    async obtenerOCrearCategoria(nombre) {
+      async obtenerOCrearCategoria(nombre) {
       const existente = this.categorias.find(c => c.nombre.toLowerCase() === nombre.toLowerCase())
       if (existente) return existente._id
       const creada = await this.peticion('/categorias', {
         method: 'POST',
         body: JSON.stringify({ nombre, descripcion: nombre }),
       })
-      if (!creada.categoria || !creada.categoria._id) {
-        throw new Error('El servidor no regresó la categoría creada. Revisa que POST /categorias responda con { categoria: ... }.')
+      if (!creada?.categoria?._id) {
+        throw new Error('El servidor no regresó la categoría creada.')
       }
       this.categorias.push(creada.categoria)
       return creada.categoria._id
-    },
+      },
+      abrirNuevaCategoria() {
+      this.formCategoria = { nombre: '', descripcion: '', error: '' }
+      this.modalCategoria = true
+      },
+      async guardarCategoria() {
+      const nombre = this.formCategoria.nombre.trim()
+      const descripcion = this.formCategoria.descripcion.trim()
+      if (!nombre || !descripcion) {
+        this.formCategoria.error = 'Completa nombre y descripción.'
+        return
+      }
+    if (this.categorias.some(c => c.nombre.toLowerCase() === nombre.toLowerCase())) {
+      this.formCategoria.error = 'Ya existe una categoría con ese nombre.'
+      return
+    }
+    try {
+      const creada = await this.peticion('/categorias', {
+        method: 'POST',
+        body: JSON.stringify({ nombre, descripcion }),
+      })
+      if (!creada?.categoria?._id) {
+        this.formCategoria.error = 'El servidor no regresó la categoría creada.'
+        return
+      }
+      this.categorias.push(creada.categoria)
+      this.modalCategoria = false
+      this.showToast('Categoría agregada.')
+    } catch (e) {
+      this.formCategoria.error = e.message
+    }
+},
     async guardarPlatillo() {
       const nombre = this.formPlatillo.nombre.trim()
       const descripcion = this.formPlatillo.descripcion.trim()
@@ -587,32 +618,7 @@ export default {
         await this.cargarMenu()
       } catch (e) { this.formPlatillo.error = e.message }
     },
-    abrirNuevaCategoria() {
-  this.formCategoria = { nombre: '', descripcion: '', error: '' }
-  this.modalCategoria = true
-},
-async guardarCategoria() {
-  const nombre = this.formCategoria.nombre.trim()
-  const descripcion = this.formCategoria.descripcion.trim()
-  if (!nombre || !descripcion) {
-    this.formCategoria.error = 'Completa nombre y descripción.'
-    return
-  }
-  if (this.categorias.some(c => c.nombre.toLowerCase() === nombre.toLowerCase())) {
-    this.formCategoria.error = 'Ya existe una categoría con ese nombre.'
-    return
-  }
-  try {
-    const creada = await this.peticion('/categorias', {
-      method: 'POST',
-      body: JSON.stringify({ nombre, descripcion }),
-    })
-    if (!creada.categoria) throw new Error('El servidor no regresó la categoría creada.')
-    this.categorias.push(creada.categoria)
-    this.modalCategoria = false
-    this.showToast('Categoría agregada.')
-  } catch (e) { this.formCategoria.error = e.message }
-},
+   
 
     // ---------- USUARIOS ----------
     async cargarUsuarios() {
