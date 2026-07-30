@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import Login from '../login.vue'
 import AdminPanel from '../AdminPanel.vue'
 import Mesero from '../Mesero.vue'
+import Cocina from '../Cocina.vue'
 import { rutaPorRol } from './roles'
 
 // Cada ruta protegida declara qué rol(es) puede entrar en meta.roles.
@@ -24,8 +25,13 @@ const routes = [
     component: Mesero,
     meta: { roles: ['mesero'] },
   },
+  {
+    path: '/cocina',
+    name: 'cocina',
+    component: Cocina,
+    meta: { roles: ['cocinero'] },
+  },
 ]
-
 const router = createRouter({
   history: createWebHistory(),
   routes,

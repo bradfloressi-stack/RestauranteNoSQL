@@ -539,6 +539,9 @@ export default {
         method: 'POST',
         body: JSON.stringify({ nombre, descripcion: nombre }),
       })
+      if (!creada.categoria || !creada.categoria._id) {
+        throw new Error('El servidor no regresó la categoría creada. Revisa que POST /categorias responda con { categoria: ... }.')
+      }
       this.categorias.push(creada.categoria)
       return creada.categoria._id
     },

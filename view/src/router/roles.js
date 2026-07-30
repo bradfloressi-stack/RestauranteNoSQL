@@ -2,5 +2,5 @@
 export const rutaPorRol = {
   cajero: '/admin',
   mesero: '/mesero',
-  cocinero: '/admin',
+  cocinero: '/cocina',
 }
