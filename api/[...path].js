@@ -11,6 +11,11 @@ app.use(express.json());
 app.use(morgan('dev'));
 app.use(cors());
 
+app.use((req, res, next) => {
+    req.url = req.url.replace(/^\/api/, '');
+    next();
+});
+
 // Reutiliza la conexión entre invocaciones (evita reconectar en cada request)
 let conexionLista = false;
 async function conectarDB() {
