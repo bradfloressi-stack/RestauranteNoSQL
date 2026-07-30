@@ -9,5 +9,9 @@ import vue from '@vitejs/plugin-vue'
 // (junto al backend). Así puedes correr "vite" desde la raíz sin mover nada.
 export default defineConfig({
   root: 'view',
+  build: {
+    outDir: '../dist',
+    emptyOutDir: true
+  },
   plugins: [vue()],
 })
