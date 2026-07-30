@@ -122,6 +122,7 @@
         <section v-if="tab === 'menu'" class="panel-card">
           <div class="panel-head">
             <div class="panel-title">Menú del restaurante</div>
+            <button class="btn-mini btn-mini-outline" @click="abrirNuevaCategoria">+ Nueva categoría</button>
             <button class="btn-mini btn-mini-green" @click="abrirNuevoPlatillo">+ Nuevo platillo</button>
           </div>
           <div v-for="cat in menuPorCategoria" :key="cat.nombre" class="menu-cat-block">
@@ -278,6 +279,21 @@
         </div>
       </div>
     </div>
+    <!-- CATEGORÍA -->
+    <div v-if="modalCategoria" class="modal-overlay" @click.self="modalCategoria = false">
+      <div class="modal-box">
+        <div class="modal-title-serif">Nueva categoría</div>
+        <label class="field-label">Nombre de la categoría</label>
+        <input v-model="formCategoria.nombre" class="field-input" placeholder="Ej. Bebidas" />
+        <label class="field-label">Descripción</label>
+        <input v-model="formCategoria.descripcion" class="field-input" placeholder="Ej. Refrescos, aguas y cervezas" />
+        <div v-if="formCategoria.error" class="field-error">{{ formCategoria.error }}</div>
+        <div class="modal-actions">
+          <button class="btn-outline" @click="modalCategoria = false">Cancelar</button>
+          <button class="btn-solid-green" @click="guardarCategoria">Agregar</button>
+        </div>
+      </div>
+    </div>
 
     <!-- CONFIRMAR ELIMINAR -->
     <div v-if="modalEliminar" class="modal-overlay" @click.self="modalEliminar = null">
@@ -332,6 +348,9 @@ export default {
 
       modalMesa: false,
       formMesa: { numero: '', capacidad: '', error: '' },
+
+      modalCategoria: false,
+      formCategoria: { nombre: '', descripcion: '', error: '' },
 
       modalEliminar: null, // { kind, id, label }
 
@@ -568,6 +587,32 @@ export default {
         await this.cargarMenu()
       } catch (e) { this.formPlatillo.error = e.message }
     },
+    abrirNuevaCategoria() {
+  this.formCategoria = { nombre: '', descripcion: '', error: '' }
+  this.modalCategoria = true
+},
+async guardarCategoria() {
+  const nombre = this.formCategoria.nombre.trim()
+  const descripcion = this.formCategoria.descripcion.trim()
+  if (!nombre || !descripcion) {
+    this.formCategoria.error = 'Completa nombre y descripción.'
+    return
+  }
+  if (this.categorias.some(c => c.nombre.toLowerCase() === nombre.toLowerCase())) {
+    this.formCategoria.error = 'Ya existe una categoría con ese nombre.'
+    return
+  }
+  try {
+    const creada = await this.peticion('/categorias', {
+      method: 'POST',
+      body: JSON.stringify({ nombre, descripcion }),
+    })
+    if (!creada.categoria) throw new Error('El servidor no regresó la categoría creada.')
+    this.categorias.push(creada.categoria)
+    this.modalCategoria = false
+    this.showToast('Categoría agregada.')
+  } catch (e) { this.formCategoria.error = e.message }
+},
 
     // ---------- USUARIOS ----------
     async cargarUsuarios() {
