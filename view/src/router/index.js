@@ -1,6 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Login from '../login.vue'
 import AdminPanel from '../AdminPanel.vue'
+import Mesero from '../Mesero.vue'
+import { rutaPorRol } from './roles'
 
 // Cada ruta protegida declara qué rol(es) puede entrar en meta.roles.
 const routes = [
@@ -16,6 +18,12 @@ const routes = [
     component: AdminPanel,
     meta: { roles: ['cajero'] },
   },
+  {
+    path: '/mesero',
+    name: 'mesero',
+    component: Mesero,
+    meta: { roles: ['mesero'] },
+  },
 ]
 
 const router = createRouter({
@@ -26,13 +34,6 @@ const router = createRouter({
 function usuarioActual() {
   const raw = localStorage.getItem('usuario')
   return raw ? JSON.parse(raw) : null
-}
-
-// Ruta de cada rol una vez logueado.
-const rutaPorRol = {
-  cajero: '/admin',
-  mesero: '/admin',
-  cocinero: '/admin',
 }
 
 router.beforeEach((to) => {

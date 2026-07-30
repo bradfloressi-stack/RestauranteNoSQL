@@ -13,6 +13,8 @@
 </template>
 
 <script>
+import { rutaPorRol } from './router/roles'
+
 export default {
   data() {
     return {
@@ -55,7 +57,6 @@ export default {
         // Guardamos el usuario logueado para que otras vistas sepan quién entró.
         localStorage.setItem('usuario', JSON.stringify(data.usuario))
 
-        const rutaPorRol = { cajero: '/admin', mesero: '/admin', cocinero: '/admin' }
         this.$router.push(rutaPorRol[data.usuario.rol] || '/admin')
       } catch (err) {
         this.error = 'No se pudo conectar con el servidor.'

@@ -102,7 +102,8 @@ const platilloOrdenSchema = new mongoose.Schema({
         type: String,
         enum: ["proceso", "cocinado", "ventanilla"],
         default: "proceso"
-    }
+    },
+    entregado: { type: Boolean, default: false }
 }, { _id: true });
 
 const ordenSchema = new mongoose.Schema({
@@ -111,12 +112,16 @@ const ordenSchema = new mongoose.Schema({
         ref: "Mesa"
     },
     mesero: {
+        // Antes apuntaba a "Empleado", pero quien crea la orden es el Usuario
+        // que inició sesión (colección de login), no un Empleado. Con la
+        // referencia anterior populate("mesero") nunca encontraba nada.
         type: mongoose.Schema.Types.ObjectId,
-        ref: "Empleado"
+        ref: "Usuario"
     },
     platillos: [platilloOrdenSchema],
     total: { type: Number, default: 0 },
-    pagada: { type: Boolean, default: false }
+    pagada: { type: Boolean, default: false },
+    nota: { type: String, default: "" }
 }, {
     timestamps: true
 });
@@ -148,6 +153,15 @@ const movimientoCajaSchema = new mongoose.Schema({
 });
 
 const movimientoCaja = mongoose.model("MovimientoCaja", movimientoCajaSchema, "movimientosCaja");
+
+// Misma regla que usa GET /caja/estado: si no hay movimientos o el último
+// fue un "cierre", la caja está cerrada. Se reutiliza para bloquear la
+// creación de órdenes cuando no hay turno de caja abierto.
+async function cajaEstaAbierta() {
+    const ultimoMovimiento = await movimientoCaja.findOne().sort({ createdAt: -1 });
+    if (!ultimoMovimiento || ultimoMovimiento.tipo === "cierre") return false;
+    return true;
+}
 
 // Definición del esquema de usuarios (login)
 const usuariosSchema = new mongoose.Schema({
@@ -823,7 +837,7 @@ app.get("/ordenes/:id", async (req, res) => {
 // y calculamos el total automáticamente.
 app.post("/ordenes", async (req, res) => {
     try {
-        const { mesa, mesero, platillos } = req.body;
+        const { mesa, mesero, platillos, nota } = req.body;
 
         if (!mesa || !mesero || !Array.isArray(platillos) || platillos.length === 0) {
             return res.status(400).json({
@@ -831,10 +845,20 @@ app.post("/ordenes", async (req, res) => {
             });
         }
 
-        const idsMenu = platillos.map(p => p.menu);
-        const platillosMenu = await menues.find({ _id: { $in: idsMenu } });
+        if (!(await cajaEstaAbierta())) {
+            return res.status(400).json({
+                mensaje: "No se pueden crear órdenes: la caja está cerrada"
+            });
+        }
 
-        if (platillosMenu.length !== idsMenu.length) {
+        const idsMenu = platillos.map(p => p.menu);
+        // $in no "multiplica" resultados por ids repetidos (2 tacos = mismo id
+        // dos veces en el arreglo); Mongo regresa cada documento una sola vez.
+        // Por eso se compara contra los ids ÚNICOS, no contra el arreglo completo.
+        const idsMenuUnicos = [...new Set(idsMenu)];
+        const platillosMenu = await menues.find({ _id: { $in: idsMenuUnicos } });
+
+        if (platillosMenu.length !== idsMenuUnicos.length) {
             return res.status(400).json({
                 mensaje: "Uno o más platillos del menú no existen"
             });
@@ -853,7 +877,7 @@ app.post("/ordenes", async (req, res) => {
         const total = platillosOrden.reduce((suma, p) => suma + p.precio, 0);
 
         const nuevaOrden = new orden({
-            mesa, mesero, platillos: platillosOrden, total
+            mesa, mesero, platillos: platillosOrden, total, nota: nota || ""
         });
 
         await nuevaOrden.save();
@@ -909,6 +933,112 @@ app.put("/ordenes/:id/platillos/:platilloId/avanzar", async (req, res) => {
     } catch (error) {
         res.status(400).json({
             mensaje: "Error al avanzar el platillo",
+            error: error
+        });
+    }
+});
+
+// Agregar platillos a una orden ya existente (lo usa el mesero al "editar" una
+// orden que ya envió: los platillos nuevos entran a cocina como "proceso",
+// los que ya estaban no se tocan). También permite actualizar la nota.
+app.put("/ordenes/:id/platillos", async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { platillos, nota } = req.body;
+
+        if (!Array.isArray(platillos) || platillos.length === 0) {
+            return res.status(400).json({
+                mensaje: "Debes enviar al menos un platillo para agregar"
+            });
+        }
+
+        const ordenEncontrada = await orden.findById(id);
+        if (!ordenEncontrada) {
+            return res.status(404).json({
+                mensaje: "Orden no encontrada"
+            });
+        }
+        if (ordenEncontrada.pagada) {
+            return res.status(400).json({
+                mensaje: "No se pueden agregar platillos a una orden ya pagada"
+            });
+        }
+
+        const idsMenu = platillos.map(p => p.menu);
+        const idsMenuUnicos = [...new Set(idsMenu)];
+        const platillosMenu = await menues.find({ _id: { $in: idsMenuUnicos } });
+
+        if (platillosMenu.length !== idsMenuUnicos.length) {
+            return res.status(400).json({
+                mensaje: "Uno o más platillos del menú no existen"
+            });
+        }
+
+        const nuevosPlatillos = platillos.map(p => {
+            const encontrado = platillosMenu.find(m => m._id.toString() === p.menu);
+            return {
+                menu: encontrado._id,
+                nombre: encontrado.nombre,
+                precio: encontrado.precio,
+                estado: "proceso"
+            };
+        });
+
+        ordenEncontrada.platillos.push(...nuevosPlatillos);
+        ordenEncontrada.total = ordenEncontrada.platillos.reduce((suma, p) => suma + p.precio, 0);
+        if (nota !== undefined) ordenEncontrada.nota = nota;
+
+        await ordenEncontrada.save();
+
+        res.json({
+            mensaje: "Platillos agregados y enviados a cocina",
+            orden: ordenEncontrada
+        });
+
+    } catch (error) {
+        res.status(400).json({
+            mensaje: "Error al agregar platillos a la orden",
+            error: error
+        });
+    }
+});
+
+// Marcar un platillo como entregado en mesa (lo usa el mesero cuando ya lo llevó)
+app.put("/ordenes/:id/platillos/:platilloId/entregar", async (req, res) => {
+    try {
+        const { id, platilloId } = req.params;
+
+        const ordenEncontrada = await orden.findById(id);
+        if (!ordenEncontrada) {
+            return res.status(404).json({
+                mensaje: "Orden no encontrada"
+            });
+        }
+
+        const platillo = ordenEncontrada.platillos.id(platilloId);
+        if (!platillo) {
+            return res.status(404).json({
+                mensaje: "Platillo no encontrado dentro de la orden"
+            });
+        }
+
+        if (platillo.estado !== "ventanilla") {
+            return res.status(400).json({
+                mensaje: "El platillo aún no está listo en ventanilla"
+            });
+        }
+
+        platillo.entregado = true;
+        await ordenEncontrada.save();
+
+        res.json({
+            mensaje: "Platillo marcado como entregado",
+            orden: ordenEncontrada
+        });
+
+    } catch (error) {
+        res.status(400).json({
+            mensaje: "Error al marcar el platillo como entregado",
             error: error
         });
     }
