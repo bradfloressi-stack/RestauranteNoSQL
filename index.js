@@ -238,23 +238,26 @@ app.get("/categorias/:id", async (req, res) => {
 });
 
 // Crear una nueva categoría
-app.post("/categorias", requiereCampos("nombre", "descripcion"), async (req, res) => {
+app.post("/categorias", async (req, res) => {
     try {
         const {
             nombre,
             descripcion
         } = req.body;
+        if(!nombre || !descripcion){
+            return res.status(400).json({
+                mensaje: "Faltan datos de la categoría"
+            });
+        }
 
         const nuevaCategoria = new categoria({
             nombre, descripcion
         });
 
-
-
         await nuevaCategoria.save();
         res.status(201).json({
-        mensaje: "Categoría creada correctamente",
-        categoria: nuevaCategoria
+            mensaje: "Categoría creada correctamente",
+            categoria: nuevaCategoria
         });
 
     } catch (error) {

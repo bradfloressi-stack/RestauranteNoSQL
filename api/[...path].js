@@ -255,7 +255,8 @@ app.post("/categorias", async (req, res) => {
 
         await nuevaCategoria.save();
         res.status(201).json({
-            mensaje: "Categoría creada correctamente"
+            mensaje: "Categoría creada correctamente",
+            categoria: nuevaCategoria
         });
 
     } catch (error) {
