@@ -249,10 +249,12 @@ app.post("/categorias", requiereCampos("nombre", "descripcion"), async (req, res
             nombre, descripcion
         });
 
+
+
         await nuevaCategoria.save();
         res.status(201).json({
-            mensaje: "Categoría creada correctamente",
-            categoria: nuevaCategoria
+        mensaje: "Categoría creada correctamente",
+        categoria: nuevaCategoria
         });
 
     } catch (error) {
