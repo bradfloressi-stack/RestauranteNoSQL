@@ -11,6 +11,24 @@ app.use(morgan('dev'));
 
 app.use(cors());
 
+// ---------- MIDDLEWARE PROPIO ----------
+// Middleware de validación reutilizable: revisa que ciertos campos vengan en
+// el body antes de que la petición llegue a la ruta. Evita repetir el mismo
+// "if (!x || !y) return 400..." en cada ruta de creación.
+function requiereCampos(...campos) {
+    return (req, res, next) => {
+        const faltantes = campos.filter(c =>
+            req.body[c] === undefined || req.body[c] === null || req.body[c] === ""
+        );
+        if (faltantes.length > 0) {
+            return res.status(400).json({
+                mensaje: `Faltan datos obligatorios: ${faltantes.join(", ")}`
+            });
+        }
+        next();
+    };
+}
+
 mongoose.connect(process.env.MONGO_URI).then(() => {
     console.log("Conectado a la base de datos");
 }).catch((err) => {
@@ -176,11 +194,6 @@ const usuariosSchema = new mongoose.Schema({
 
 const usuario = mongoose.model("Usuario", usuariosSchema, "usuarios");
 
-// Mensaje de iniciación del servidor
-app.listen(PORT, () => {
-    console.log(`Servidor escuchando en http://localhost:${PORT}`);
-});
-
 //--------------------------------------------------------------
 //------------------------------APIs----------------------------
 //..............................................................
@@ -225,17 +238,12 @@ app.get("/categorias/:id", async (req, res) => {
 });
 
 // Crear una nueva categoría
-app.post("/categorias", async (req, res) => {
+app.post("/categorias", requiereCampos("nombre", "descripcion"), async (req, res) => {
     try {
         const {
             nombre,
             descripcion
         } = req.body;
-        if(!nombre || !descripcion){
-            return res.status(400).json({
-                mensaje: "Faltan datos de la categoría"
-            });
-        }
 
         const nuevaCategoria = new categoria({
             nombre, descripcion
@@ -243,7 +251,8 @@ app.post("/categorias", async (req, res) => {
 
         await nuevaCategoria.save();
         res.status(201).json({
-            mensaje: "Categoría creada correctamente"
+            mensaje: "Categoría creada correctamente",
+            categoria: nuevaCategoria
         });
 
     } catch (error) {
@@ -340,7 +349,7 @@ app.get("/menu/:id", async (req, res) => {
 });
 
 // Crear un nuevo platillo del menú
-app.post("/menu", async (req, res) => {
+app.post("/menu", requiereCampos("nombre", "descripcion", "precio"), async (req, res) => {
     try {
         const {
             nombre,
@@ -351,19 +360,14 @@ app.post("/menu", async (req, res) => {
             imagen
         } = req.body;
 
-        if (!nombre || !descripcion || precio == null) {
-            return res.status(400).json({
-                mensaje: "Faltan datos del platillo"
-            });
-        }
-
         const nuevoPlatillo = new menues({
             nombre, descripcion, precio, categoria, clasificacion, imagen
         });
 
         await nuevoPlatillo.save();
         res.status(201).json({
-            mensaje: "Platillo creado correctamente"
+            mensaje: "Platillo creado correctamente",
+            platillo: nuevoPlatillo
         });
 
     } catch (error) {
@@ -464,15 +468,9 @@ app.get("/mesas/:id", async (req, res) => {
 });
 
 // Crear una nueva mesa
-app.post("/mesas", async (req, res) => {
+app.post("/mesas", requiereCampos("numero", "capacidad"), async (req, res) => {
     try {
         const { numero, capacidad } = req.body;
-
-        if (!numero || !capacidad) {
-            return res.status(400).json({
-                mensaje: "Faltan datos de la mesa"
-            });
-        }
 
         const nuevaMesa = new mesa({
             numero, capacidad
@@ -480,7 +478,8 @@ app.post("/mesas", async (req, res) => {
 
         await nuevaMesa.save();
         res.status(201).json({
-            mensaje: "Mesa creada correctamente"
+            mensaje: "Mesa creada correctamente",
+            mesa: nuevaMesa
         });
 
     } catch (error) {
@@ -577,15 +576,9 @@ app.get("/empleados/:id", async (req, res) => {
 });
 
 // Crear un nuevo empleado
-app.post("/empleados", async (req, res) => {
+app.post("/empleados", requiereCampos("nombre", "cargo"), async (req, res) => {
     try {
         const { nombre, cargo, edad, sueldo, mesaAsignada } = req.body;
-
-        if (!nombre || !cargo) {
-            return res.status(400).json({
-                mensaje: "Faltan datos del empleado"
-            });
-        }
 
         const nuevoEmpleado = new empleado({
             nombre, cargo, edad, sueldo, mesaAsignada
@@ -593,7 +586,8 @@ app.post("/empleados", async (req, res) => {
 
         await nuevoEmpleado.save();
         res.status(201).json({
-            mensaje: "Empleado creado correctamente"
+            mensaje: "Empleado creado correctamente",
+            empleado: nuevoEmpleado
         });
 
     } catch (error) {
@@ -694,15 +688,9 @@ app.get("/chefs/:id", async (req, res) => {
 });
 
 // Crear un nuevo chef
-app.post("/chefs", async (req, res) => {
+app.post("/chefs", requiereCampos("nombre", "posicion"), async (req, res) => {
     try {
         const { nombre, posicion, especialidad } = req.body;
-
-        if (!nombre || !posicion) {
-            return res.status(400).json({
-                mensaje: "Faltan datos del chef"
-            });
-        }
 
         const nuevoChef = new chef({
             nombre, posicion, especialidad
@@ -710,7 +698,8 @@ app.post("/chefs", async (req, res) => {
 
         await nuevoChef.save();
         res.status(201).json({
-            mensaje: "Chef creado correctamente"
+            mensaje: "Chef creado correctamente",
+            chef: nuevoChef
         });
 
     } catch (error) {
@@ -835,13 +824,13 @@ app.get("/ordenes/:id", async (req, res) => {
 // El body solo manda { mesa, mesero, platillos: [{ menu: "<id>" }, ...] }.
 // Aquí buscamos cada platillo en el Menú para "congelar" nombre y precio,
 // y calculamos el total automáticamente.
-app.post("/ordenes", async (req, res) => {
+app.post("/ordenes", requiereCampos("mesa", "mesero"), async (req, res) => {
     try {
         const { mesa, mesero, platillos, nota } = req.body;
 
-        if (!mesa || !mesero || !Array.isArray(platillos) || platillos.length === 0) {
+        if (!Array.isArray(platillos) || platillos.length === 0) {
             return res.status(400).json({
-                mensaje: "Faltan datos de la orden (mesa, mesero y al menos un platillo)"
+                mensaje: "La orden debe tener al menos un platillo"
             });
         }
 
@@ -1176,15 +1165,9 @@ app.get("/caja/estado", async (req, res) => {
 
 // Registrar un movimiento de caja (apertura, cierre, entrada o salida manual)
 // Las ventas ("venta") no se crean aquí directamente, se generan solas al pagar una orden.
-app.post("/movimientos-caja", async (req, res) => {
+app.post("/movimientos-caja", requiereCampos("tipo", "monto"), async (req, res) => {
     try {
         const { tipo, monto, cajero, descripcion } = req.body;
-
-        if (!tipo || monto == null) {
-            return res.status(400).json({
-                mensaje: "Faltan datos del movimiento (tipo y monto son obligatorios)"
-            });
-        }
 
         if (!["apertura", "cierre", "entrada", "salida"].includes(tipo)) {
             return res.status(400).json({
@@ -1245,15 +1228,9 @@ app.get("/usuarios/:id", async (req, res) => {
 });
 
 // Crear un nuevo usuario
-app.post("/usuarios", async (req, res) => {
+app.post("/usuarios", requiereCampos("usuario", "password", "nombre", "rol"), async (req, res) => {
     try {
         const { usuario: nombreUsuario, password, nombre, rol } = req.body;
-
-        if (!nombreUsuario || !password || !nombre || !rol) {
-            return res.status(400).json({
-                mensaje: "Faltan datos del usuario (usuario, password, nombre y rol son obligatorios)"
-            });
-        }
 
         const passwordHash = await bcrypt.hash(password, 10);
 
@@ -1345,15 +1322,9 @@ app.delete("/usuarios/:id", async (req, res) => {
 
 
 // -----------------RUTA DE LOGIN-----------------
-app.post("/login", async (req, res) => {
+app.post("/login", requiereCampos("usuario", "password"), async (req, res) => {
     try {
         const { usuario: nombreUsuario, password } = req.body;
-
-        if (!nombreUsuario || !password) {
-            return res.status(400).json({
-                mensaje: "Usuario y contraseña son obligatorios"
-            });
-        }
 
         const usuarioEncontrado = await usuario.findOne({
             usuario: nombreUsuario.trim().toLowerCase()
@@ -1389,4 +1360,28 @@ app.post("/login", async (req, res) => {
             error: error
         });
     }
+});
+
+// ---------- MIDDLEWARES DE CIERRE (van al final: después de todas las rutas) ----------
+
+// Si ninguna ruta de arriba respondió, la URL/método no existe en esta API.
+app.use((req, res) => {
+    res.status(404).json({
+        mensaje: `Ruta no encontrada: ${req.method} ${req.originalUrl}`
+    });
+});
+
+// Manejador de errores global de Express (siempre 4 parámetros: err, req, res, next).
+// Sirve de red de seguridad para cualquier error que no se haya capturado con
+// try/catch dentro de una ruta, y para cuando una ruta llama a next(error).
+app.use((err, req, res, next) => {
+    console.error(err);
+    res.status(500).json({
+        mensaje: "Error interno del servidor",
+        error: err.message
+    });
+});
+
+app.listen(PORT, () => {
+    console.log(`Servidor escuchando en http://localhost:${PORT}`);
 });
