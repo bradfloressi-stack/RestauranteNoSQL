@@ -28,25 +28,6 @@ app.use(async (req, res, next) => {
     }
 });
 
-require('dotenv').config();
-const express = require('express');
-const morgan = require('morgan');
-const mongoose = require("mongoose");
-const cors = require("cors");
-const bcrypt = require("bcryptjs");
-const app = express();
-const PORT = process.env.PORT || 3000;
-app.use(express.json());
-app.use(morgan('dev'));
-
-app.use(cors());
-
-mongoose.connect(process.env.MONGO_URI).then(() => {
-    console.log("Conectado a la base de datos");
-}).catch((err) => {
-    console.log("Error al conectar a la base de datos", err);
-});
-
 // Definición del esquema de categorías
 const categoriasSchema = new mongoose.Schema({
     nombre: String,
