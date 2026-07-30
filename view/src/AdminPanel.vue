@@ -6,7 +6,7 @@
         <div class="brand">
           <div>
             <div class="brand-title">Administración</div>
-            <div class="brand-sub">Cantina Central</div>
+            <div class="brand-sub">Sucursal Principal</div>
           </div>
           <div class="user-pill">
             {{ currentUser ? currentUser.nombre : "" }}
